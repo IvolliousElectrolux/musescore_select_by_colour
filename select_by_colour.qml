@@ -27,13 +27,17 @@ MuseScore {
     requiresScore: true
 
     width: 460
-    height: 480
+    height: 520
 
     // Default target colour (black, fully opaque)
     property string targetColourHex: "#000000"
     property int targetAlpha: 255
     property int matchedCount: 0
     property bool elementPanelVisible: false
+
+    // New colour for replacement
+    property string newColourHex: "#000000"
+    property int newAlpha: 255
 
     // Element type filters
     property bool matchNote: true
@@ -336,6 +340,140 @@ MuseScore {
         }
     }
 
+    // Get new color in full ARGB format
+    function getNewColorString() {
+        var alpha = newAlpha.toString(16)
+        if (alpha.length < 2) alpha = "0" + alpha
+        return "#" + alpha + newColourHex.substring(1)
+    }
+
+    // Change colour of matched elements directly (without selecting)
+    function changeColourOfMatched() {
+        if (!curScore) {
+            statusLabel.text = qsTr("No score open!")
+            return
+        }
+
+        var changedCount = 0
+        var newColor = getNewColorString()
+
+        curScore.startCmd()
+
+        // Search entire score
+        var cursor = curScore.newCursor()
+        for (var staff = 0; staff < curScore.nstaves; staff++) {
+            for (var voice = 0; voice < 4; voice++) {
+                cursor.staffIdx = staff
+                cursor.voice = voice
+                cursor.rewind(Cursor.SCORE_START)
+
+                while (cursor.segment) {
+                    if (cursor.element) {
+                        if (cursor.element.type === Element.CHORD) {
+                            changedCount += changeChordColors(cursor.element, newColor)
+                        } else if (cursor.element.type === Element.REST && matchRest) {
+                            if (colorsMatch(cursor.element.color)) {
+                                cursor.element.color = newColor
+                                changedCount++
+                            }
+                        }
+                    }
+                    cursor.next()
+                }
+            }
+        }
+
+        // Search spanners
+        if (matchSlur || matchHairpin || matchOttava || matchPedal) {
+            var spanners = curScore.spanners
+            for (var s in spanners) {
+                var spanner = spanners[s]
+                if (spanner && spanner.color !== undefined) {
+                    if (shouldMatchType(spanner.type) && colorsMatch(spanner.color)) {
+                        spanner.color = newColor
+                        changedCount++
+                    }
+                }
+            }
+        }
+
+        curScore.endCmd()
+        statusLabel.text = qsTr("Changed colour of %1 element(s)").arg(changedCount)
+    }
+
+    // Change colours of chord sub-elements
+    function changeChordColors(chord, newColor) {
+        var count = 0
+
+        // Notes
+        if (matchNote) {
+            for (var n = 0; n < chord.notes.length; n++) {
+                var note = chord.notes[n]
+                if (colorsMatch(note.color)) {
+                    note.color = newColor
+                    count++
+                }
+            }
+        }
+
+        // Note-attached elements
+        for (var n2 = 0; n2 < chord.notes.length; n2++) {
+            var note2 = chord.notes[n2]
+
+            // Note dots
+            if (matchNoteDot && note2.dots) {
+                for (var d = 0; d < note2.dots.length; d++) {
+                    if (note2.dots[d] && colorsMatch(note2.dots[d].color)) {
+                        note2.dots[d].color = newColor
+                        count++
+                    }
+                }
+            }
+
+            // Accidentals
+            if (matchAccidental && note2.accidental && colorsMatch(note2.accidental.color)) {
+                note2.accidental.color = newColor
+                count++
+            }
+
+            // Ties
+            if (matchTie && note2.tieForward && colorsMatch(note2.tieForward.color)) {
+                note2.tieForward.color = newColor
+                count++
+            }
+        }
+
+        // Stem
+        if (matchStem && chord.stem && colorsMatch(chord.stem.color)) {
+            chord.stem.color = newColor
+            count++
+        }
+
+        // Hook
+        if (matchHook && chord.hook && colorsMatch(chord.hook.color)) {
+            chord.hook.color = newColor
+            count++
+        }
+
+        // Beam
+        if (matchBeam && chord.beam && colorsMatch(chord.beam.color)) {
+            chord.beam.color = newColor
+            count++
+        }
+
+        // Articulations
+        if (matchArticulation && chord.articulations) {
+            for (var a = 0; a < chord.articulations.length; a++) {
+                if (colorsMatch(chord.articulations[a].color)) {
+                    chord.articulations[a].color = newColor
+                    count++
+                }
+            }
+        }
+
+        return count
+    }
+
     // Get active element types description
     function getActiveTypesText() {
         var types = []
@@ -452,6 +590,60 @@ MuseScore {
                 text: qsTr("(255=opaque, 0=transparent)")
                 anchors.verticalCenter: parent.verticalCenter
                 opacity: 0.7
+            }
+        }
+
+        // New colour row (for Change function)
+        Row {
+            spacing: 10
+
+            StyledTextLabel {
+                text: qsTr("New Colour:")
+                anchors.verticalCenter: parent.verticalCenter
+            }
+
+            Rectangle {
+                id: newColourPreview
+                width: 40
+                height: 28
+                color: newColourHex
+                opacity: newAlpha / 255.0
+                border.color: ui.theme.strokeColor
+                border.width: 1
+                radius: 3
+
+                Rectangle {
+                    anchors.fill: parent
+                    z: -1
+                    color: "#ffffff"
+                    radius: 3
+                }
+            }
+
+            TextInputField {
+                id: newColorInput
+                width: 100
+                currentText: newColourHex
+
+                onTextChanged: function(newText) {
+                    var hexPattern = /^#[0-9A-Fa-f]{6}$/
+                    if (hexPattern.test(newText)) {
+                        newColourHex = newText.toLowerCase()
+                    }
+                }
+            }
+
+            TextInputField {
+                id: newAlphaInput
+                width: 50
+                currentText: newAlpha.toString()
+
+                onTextChanged: function(newText) {
+                    var val = parseInt(newText)
+                    if (!isNaN(val) && val >= 0 && val <= 255) {
+                        newAlpha = val
+                    }
+                }
             }
         }
 
@@ -594,6 +786,11 @@ MuseScore {
             text: qsTr("Select")
             accentButton: true
             onClicked: selectByColour()
+        }
+
+        FlatButton {
+            text: qsTr("Change")
+            onClicked: changeColourOfMatched()
         }
 
         FlatButton {
