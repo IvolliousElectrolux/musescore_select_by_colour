@@ -318,28 +318,22 @@ MuseScore {
         "#009c95", "#0071bb", "#5e50a1", "#cf3e96"
     ]
 
-    Item {
-        id: window
+    Column {
+        id: mainColumn
         anchors.fill: parent
+        anchors.margins: 15
+        spacing: 10
 
         // Title
         StyledTextLabel {
-            id: titleLabel
             text: qsTr("Select Elements by Colour")
             font.bold: true
             font.pixelSize: 16
-            anchors.top: parent.top
             anchors.horizontalCenter: parent.horizontalCenter
-            anchors.topMargin: 15
         }
 
         // Colour selection row (RGB)
         Row {
-            id: colourRow
-            anchors.top: titleLabel.bottom
-            anchors.left: parent.left
-            anchors.topMargin: 15
-            anchors.leftMargin: 15
             spacing: 10
 
             StyledTextLabel {
@@ -386,11 +380,6 @@ MuseScore {
 
         // Alpha row
         Row {
-            id: alphaRow
-            anchors.top: colourRow.bottom
-            anchors.left: parent.left
-            anchors.topMargin: 10
-            anchors.leftMargin: 15
             spacing: 10
 
             StyledTextLabel {
@@ -420,11 +409,6 @@ MuseScore {
 
         // Element types row
         Row {
-            id: elementTypesRow
-            anchors.top: alphaRow.bottom
-            anchors.left: parent.left
-            anchors.topMargin: 10
-            anchors.leftMargin: 15
             spacing: 10
 
             StyledTextLabel {
@@ -439,7 +423,7 @@ MuseScore {
             }
 
             FlatButton {
-                text: qsTr("Configure...")
+                text: elementPanelVisible ? qsTr("Hide") : qsTr("Configure...")
                 onClicked: elementPanelVisible = !elementPanelVisible
             }
         }
@@ -447,12 +431,7 @@ MuseScore {
         // Element types panel (collapsible)
         Rectangle {
             id: elementTypesPanel
-            anchors.top: elementTypesRow.bottom
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.topMargin: 8
-            anchors.leftMargin: 15
-            anchors.rightMargin: 15
+            width: parent.width
             height: elementPanelVisible ? 100 : 0
             visible: elementPanelVisible
             color: ui.theme.buttonColor
@@ -460,8 +439,6 @@ MuseScore {
             border.width: 1
             radius: 4
             clip: true
-
-            Behavior on height { NumberAnimation { duration: 150 } }
 
             Grid {
                 anchors.fill: parent
@@ -490,21 +467,12 @@ MuseScore {
 
         // Common colours label
         StyledTextLabel {
-            id: paletteLabel
             text: qsTr("Common Colours (Boomwhackers):")
-            anchors.top: elementTypesPanel.visible ? elementTypesPanel.bottom : elementTypesRow.bottom
-            anchors.left: parent.left
-            anchors.topMargin: 10
-            anchors.leftMargin: 15
         }
 
         // Colour palette grid
         Grid {
             id: paletteGrid
-            anchors.top: paletteLabel.bottom
-            anchors.left: parent.left
-            anchors.topMargin: 8
-            anchors.leftMargin: 15
             columns: 6
             spacing: 6
 
@@ -533,11 +501,6 @@ MuseScore {
 
         // Options
         Row {
-            id: optionsRow
-            anchors.top: paletteGrid.bottom
-            anchors.left: parent.left
-            anchors.topMargin: 15
-            anchors.leftMargin: 15
             spacing: 20
 
             CheckBox {
@@ -557,34 +520,35 @@ MuseScore {
         StyledTextLabel {
             id: statusLabel
             text: qsTr("Click 'Select' to find elements with the specified colour")
-            anchors.top: optionsRow.bottom
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.topMargin: 15
-            anchors.leftMargin: 15
-            anchors.rightMargin: 15
+            width: parent.width
             wrapMode: Text.WordWrap
         }
 
-        // Buttons row
-        Row {
-            id: buttonRow
-            anchors.bottom: parent.bottom
-            anchors.right: parent.right
-            anchors.bottomMargin: 15
-            anchors.rightMargin: 15
-            spacing: 10
+        // Spacer
+        Item {
+            width: 1
+            height: 10
+        }
+    }
 
-            FlatButton {
-                text: qsTr("Select")
-                accentButton: true
-                onClicked: selectByColour()
-            }
+    // Buttons row (fixed at bottom)
+    Row {
+        id: buttonRow
+        anchors.bottom: parent.bottom
+        anchors.right: parent.right
+        anchors.bottomMargin: 15
+        anchors.rightMargin: 15
+        spacing: 10
 
-            FlatButton {
-                text: qsTr("Close")
-                onClicked: quit()
-            }
+        FlatButton {
+            text: qsTr("Select")
+            accentButton: true
+            onClicked: selectByColour()
+        }
+
+        FlatButton {
+            text: qsTr("Close")
+            onClicked: quit()
         }
     }
 }
