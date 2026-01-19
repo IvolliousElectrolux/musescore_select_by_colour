@@ -1,7 +1,7 @@
 //=============================================================================
-//  Select Notes by Colour
+//  Select Elements by Colour
 //
-//  Select all notes of a specified colour in the score or within selection.
+//  Select all elements of a specified colour in the score or within selection.
 //  Compatible with MuseScore 4.4+
 //
 //  Copyright (C) 2026
@@ -19,20 +19,38 @@ import Muse.Ui
 import Muse.UiComponents
 
 MuseScore {
-    version: "1.1"
+    version: "1.2"
     title: qsTr("Select by Colour")
-    description: qsTr("Select all notes of a specified colour in the score or selection")
+    description: qsTr("Select elements of a specified colour in the score or selection")
     categoryCode: "composing-arranging-tools"
     pluginType: "dialog"
     requiresScore: true
 
-    width: 440
-    height: 400
+    width: 460
+    height: 480
 
     // Default target colour (black, fully opaque)
     property string targetColourHex: "#000000"
     property int targetAlpha: 255
     property int matchedCount: 0
+    property bool elementPanelVisible: false
+
+    // Element type filters
+    property bool matchNote: true
+    property bool matchStem: false
+    property bool matchBeam: false
+    property bool matchHook: false
+    property bool matchNoteDot: false
+    property bool matchSlur: false
+    property bool matchTie: false
+    property bool matchAccidental: false
+    property bool matchArticulation: false
+    property bool matchRest: false
+    property bool matchLyrics: false
+    property bool matchDynamic: false
+    property bool matchHairpin: false
+    property bool matchOttava: false
+    property bool matchPedal: false
 
     onRun: {}
 
@@ -47,36 +65,136 @@ MuseScore {
     function parseColorString(colorStr) {
         var s = colorStr.toString().toLowerCase()
         if (s.length === 9 && s.charAt(0) === '#') {
-            // #aarrggbb format
             var alpha = parseInt(s.substring(1, 3), 16)
             var rgb = "#" + s.substring(3)
             return {rgb: rgb, alpha: alpha}
         } else if (s.length === 7 && s.charAt(0) === '#') {
-            // #rrggbb format
             return {rgb: s, alpha: 255}
         }
         return {rgb: "#000000", alpha: 255}
     }
 
     // Compare colours
-    function colorsMatch(noteColor) {
-        var noteColorInfo = parseColorString(noteColor)
+    function colorsMatch(elementColor) {
+        var colorInfo = parseColorString(elementColor)
         var targetRgb = targetColourHex.toLowerCase()
 
-        if (noteColorInfo.rgb !== targetRgb) {
+        if (colorInfo.rgb !== targetRgb) {
             return false
         }
 
-        // If "Match alpha" is checked, also compare alpha
         if (matchAlphaCheck.checked) {
-            return noteColorInfo.alpha === targetAlpha
+            return colorInfo.alpha === targetAlpha
         }
 
         return true
     }
 
-    // Main function: select notes by colour
-    function selectNotesByColour() {
+    // Check if element type should be matched
+    function shouldMatchType(elementType) {
+        switch (elementType) {
+            case Element.NOTE: return matchNote
+            case Element.STEM: return matchStem
+            case Element.BEAM: return matchBeam
+            case Element.HOOK: return matchHook
+            case Element.NOTEDOT: return matchNoteDot
+            case Element.SLUR: return matchSlur
+            case Element.TIE: return matchTie
+            case Element.ACCIDENTAL: return matchAccidental
+            case Element.ARTICULATION: return matchArticulation
+            case Element.REST: return matchRest
+            case Element.LYRICS: return matchLyrics
+            case Element.DYNAMIC: return matchDynamic
+            case Element.HAIRPIN: return matchHairpin
+            case Element.OTTAVA: return matchOttava
+            case Element.PEDAL: return matchPedal
+            default: return false
+        }
+    }
+
+    // Check element and add to list if matches
+    function checkElement(el, elementsToSelect) {
+        if (!el || el.color === undefined) return
+        if (shouldMatchType(el.type) && colorsMatch(el.color)) {
+            elementsToSelect.push(el)
+            matchedCount++
+        }
+    }
+
+    // Process chord and its sub-elements
+    function processChord(chord, elementsToSelect) {
+        // Notes
+        if (matchNote) {
+            for (var n = 0; n < chord.notes.length; n++) {
+                var note = chord.notes[n]
+                if (colorsMatch(note.color)) {
+                    elementsToSelect.push(note)
+                    matchedCount++
+                }
+                // Note dots
+                if (matchNoteDot && note.dots) {
+                    for (var d = 0; d < note.dots.length; d++) {
+                        if (note.dots[d] && colorsMatch(note.dots[d].color)) {
+                            elementsToSelect.push(note.dots[d])
+                            matchedCount++
+                        }
+                    }
+                }
+                // Accidentals
+                if (matchAccidental && note.accidental && colorsMatch(note.accidental.color)) {
+                    elementsToSelect.push(note.accidental)
+                    matchedCount++
+                }
+                // Ties from note
+                if (matchTie && note.tieForward && colorsMatch(note.tieForward.color)) {
+                    elementsToSelect.push(note.tieForward)
+                    matchedCount++
+                }
+            }
+        }
+
+        // Stem
+        if (matchStem && chord.stem && colorsMatch(chord.stem.color)) {
+            elementsToSelect.push(chord.stem)
+            matchedCount++
+        }
+
+        // Hook
+        if (matchHook && chord.hook && colorsMatch(chord.hook.color)) {
+            elementsToSelect.push(chord.hook)
+            matchedCount++
+        }
+
+        // Beam
+        if (matchBeam && chord.beam && colorsMatch(chord.beam.color)) {
+            elementsToSelect.push(chord.beam)
+            matchedCount++
+        }
+
+        // Articulations
+        if (matchArticulation && chord.articulations) {
+            for (var a = 0; a < chord.articulations.length; a++) {
+                if (colorsMatch(chord.articulations[a].color)) {
+                    elementsToSelect.push(chord.articulations[a])
+                    matchedCount++
+                }
+            }
+        }
+    }
+
+    // Process segment annotations
+    function processAnnotations(segment, track, elementsToSelect) {
+        if (!segment.annotations) return
+        for (var i = 0; i < segment.annotations.length; i++) {
+            var anno = segment.annotations[i]
+            if (anno.track === track) {
+                checkElement(anno, elementsToSelect)
+            }
+        }
+    }
+
+    // Main function: select elements by colour
+    function selectByColour() {
         if (!curScore) {
             statusLabel.text = qsTr("No score open!")
             return
@@ -91,16 +209,13 @@ MuseScore {
         console.log("Looking for colour: " + targetInfo)
 
         if (hasSelection && useSelectionCheck.checked) {
+            // Search within current selection
             for (var i = 0; i < curScore.selection.elements.length; i++) {
                 var el = curScore.selection.elements[i]
-                if (el.type === Element.NOTE) {
-                    if (colorsMatch(el.color)) {
-                        elementsToSelect.push(el)
-                        matchedCount++
-                    }
-                }
+                checkElement(el, elementsToSelect)
             }
         } else {
+            // Search entire score
             var cursor = curScore.newCursor()
             for (var staff = 0; staff < curScore.nstaves; staff++) {
                 for (var voice = 0; voice < 4; voice++) {
@@ -109,18 +224,33 @@ MuseScore {
                     cursor.rewind(Cursor.SCORE_START)
 
                     while (cursor.segment) {
-                        if (cursor.element && cursor.element.type === Element.CHORD) {
-                            var chord = cursor.element
-                            for (var n = 0; n < chord.notes.length; n++) {
-                                var note = chord.notes[n]
-                                if (colorsMatch(note.color)) {
-                                    elementsToSelect.push(note)
+                        var track = staff * 4 + voice
+
+                        if (cursor.element) {
+                            if (cursor.element.type === Element.CHORD) {
+                                processChord(cursor.element, elementsToSelect)
+                            } else if (cursor.element.type === Element.REST && matchRest) {
+                                if (colorsMatch(cursor.element.color)) {
+                                    elementsToSelect.push(cursor.element)
                                     matchedCount++
                                 }
                             }
                         }
+
+                        // Check annotations (dynamics, lyrics, etc.)
+                        processAnnotations(cursor.segment, track, elementsToSelect)
+
                         cursor.next()
                     }
+                }
+            }
+
+            // Search spanners (slurs, hairpins, ottavas, pedals)
+            if (matchSlur || matchHairpin || matchOttava || matchPedal) {
+                var spanners = curScore.spanners
+                for (var s in spanners) {
+                    var spanner = spanners[s]
+                    checkElement(spanner, elementsToSelect)
                 }
             }
         }
@@ -132,32 +262,53 @@ MuseScore {
                 curScore.selection.select(elementsToSelect[j], true)
             }
             curScore.endCmd()
-            statusLabel.text = qsTr("Selected %1 note(s)").arg(matchedCount)
+            statusLabel.text = qsTr("Selected %1 element(s)").arg(matchedCount)
         } else {
-            statusLabel.text = qsTr("No notes found with colour %1").arg(targetInfo)
+            statusLabel.text = qsTr("No elements found with colour %1").arg(targetInfo)
         }
     }
 
-    // Pick colour from selected note
+    // Pick colour from selected element
     function pickColourFromSelection() {
         if (!curScore || curScore.selection.elements.length === 0) {
-            statusLabel.text = qsTr("Please select a note first")
+            statusLabel.text = qsTr("Please select an element first")
             return
         }
 
-        for (var i = 0; i < curScore.selection.elements.length; i++) {
-            var el = curScore.selection.elements[i]
-            if (el.type === Element.NOTE) {
-                var colorInfo = parseColorString(el.color)
-                targetColourHex = colorInfo.rgb
-                targetAlpha = colorInfo.alpha
-                colorInput.currentText = colorInfo.rgb
-                alphaInput.currentText = colorInfo.alpha.toString()
-                statusLabel.text = qsTr("Picked: RGB=%1, Alpha=%2").arg(colorInfo.rgb).arg(colorInfo.alpha)
-                return
-            }
+        var el = curScore.selection.elements[0]
+        if (el.color !== undefined) {
+            var colorInfo = parseColorString(el.color)
+            targetColourHex = colorInfo.rgb
+            targetAlpha = colorInfo.alpha
+            colorInput.currentText = colorInfo.rgb
+            alphaInput.currentText = colorInfo.alpha.toString()
+            statusLabel.text = qsTr("Picked: RGB=%1, Alpha=%2").arg(colorInfo.rgb).arg(colorInfo.alpha)
+        } else {
+            statusLabel.text = qsTr("Selected element has no color property")
         }
-        statusLabel.text = qsTr("No note in selection")
+    }
+
+    // Get active element types description
+    function getActiveTypesText() {
+        var types = []
+        if (matchNote) types.push("Note")
+        if (matchStem) types.push("Stem")
+        if (matchBeam) types.push("Beam")
+        if (matchHook) types.push("Hook")
+        if (matchNoteDot) types.push("Dot")
+        if (matchSlur) types.push("Slur")
+        if (matchTie) types.push("Tie")
+        if (matchAccidental) types.push("Accid.")
+        if (matchArticulation) types.push("Artic.")
+        if (matchRest) types.push("Rest")
+        if (matchLyrics) types.push("Lyrics")
+        if (matchDynamic) types.push("Dyn.")
+        if (matchHairpin) types.push("Hairpin")
+        if (matchOttava) types.push("Ottava")
+        if (matchPedal) types.push("Pedal")
+        if (types.length === 0) return qsTr("None")
+        if (types.length > 3) return types.slice(0, 3).join(", ") + "..."
+        return types.join(", ")
     }
 
     // Boomwhackers colour palette
@@ -174,7 +325,7 @@ MuseScore {
         // Title
         StyledTextLabel {
             id: titleLabel
-            text: qsTr("Select Notes by Colour")
+            text: qsTr("Select Elements by Colour")
             font.bold: true
             font.pixelSize: 16
             anchors.top: parent.top
@@ -206,7 +357,6 @@ MuseScore {
                 border.width: 1
                 radius: 3
 
-                // Checkerboard background to show transparency
                 Rectangle {
                     anchors.fill: parent
                     z: -1
@@ -229,7 +379,7 @@ MuseScore {
             }
 
             FlatButton {
-                text: qsTr("Pick from Note")
+                text: qsTr("Pick")
                 onClicked: pickColourFromSelection()
             }
         }
@@ -262,9 +412,79 @@ MuseScore {
             }
 
             StyledTextLabel {
-                text: qsTr("(255 = opaque, 0 = transparent)")
+                text: qsTr("(255=opaque, 0=transparent)")
                 anchors.verticalCenter: parent.verticalCenter
                 opacity: 0.7
+            }
+        }
+
+        // Element types row
+        Row {
+            id: elementTypesRow
+            anchors.top: alphaRow.bottom
+            anchors.left: parent.left
+            anchors.topMargin: 10
+            anchors.leftMargin: 15
+            spacing: 10
+
+            StyledTextLabel {
+                text: qsTr("Element Types:")
+                anchors.verticalCenter: parent.verticalCenter
+            }
+
+            StyledTextLabel {
+                text: getActiveTypesText()
+                anchors.verticalCenter: parent.verticalCenter
+                opacity: 0.8
+            }
+
+            FlatButton {
+                text: qsTr("Configure...")
+                onClicked: elementPanelVisible = !elementPanelVisible
+            }
+        }
+
+        // Element types panel (collapsible)
+        Rectangle {
+            id: elementTypesPanel
+            anchors.top: elementTypesRow.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.topMargin: 8
+            anchors.leftMargin: 15
+            anchors.rightMargin: 15
+            height: elementPanelVisible ? 100 : 0
+            visible: elementPanelVisible
+            color: ui.theme.buttonColor
+            border.color: ui.theme.strokeColor
+            border.width: 1
+            radius: 4
+            clip: true
+
+            Behavior on height { NumberAnimation { duration: 150 } }
+
+            Grid {
+                anchors.fill: parent
+                anchors.margins: 8
+                columns: 5
+                rowSpacing: 4
+                columnSpacing: 4
+
+                CheckBox { id: chkNote; text: "Note"; checked: matchNote; onCheckedChanged: matchNote = checked }
+                CheckBox { id: chkStem; text: "Stem"; checked: matchStem; onCheckedChanged: matchStem = checked }
+                CheckBox { id: chkBeam; text: "Beam"; checked: matchBeam; onCheckedChanged: matchBeam = checked }
+                CheckBox { id: chkHook; text: "Hook"; checked: matchHook; onCheckedChanged: matchHook = checked }
+                CheckBox { id: chkDot; text: "Dot"; checked: matchNoteDot; onCheckedChanged: matchNoteDot = checked }
+                CheckBox { id: chkSlur; text: "Slur"; checked: matchSlur; onCheckedChanged: matchSlur = checked }
+                CheckBox { id: chkTie; text: "Tie"; checked: matchTie; onCheckedChanged: matchTie = checked }
+                CheckBox { id: chkAccid; text: "Accid."; checked: matchAccidental; onCheckedChanged: matchAccidental = checked }
+                CheckBox { id: chkArtic; text: "Artic."; checked: matchArticulation; onCheckedChanged: matchArticulation = checked }
+                CheckBox { id: chkRest; text: "Rest"; checked: matchRest; onCheckedChanged: matchRest = checked }
+                CheckBox { id: chkLyrics; text: "Lyrics"; checked: matchLyrics; onCheckedChanged: matchLyrics = checked }
+                CheckBox { id: chkDyn; text: "Dynamic"; checked: matchDynamic; onCheckedChanged: matchDynamic = checked }
+                CheckBox { id: chkHairpin; text: "Hairpin"; checked: matchHairpin; onCheckedChanged: matchHairpin = checked }
+                CheckBox { id: chkOttava; text: "Ottava"; checked: matchOttava; onCheckedChanged: matchOttava = checked }
+                CheckBox { id: chkPedal; text: "Pedal"; checked: matchPedal; onCheckedChanged: matchPedal = checked }
             }
         }
 
@@ -272,9 +492,9 @@ MuseScore {
         StyledTextLabel {
             id: paletteLabel
             text: qsTr("Common Colours (Boomwhackers):")
-            anchors.top: alphaRow.bottom
+            anchors.top: elementTypesPanel.visible ? elementTypesPanel.bottom : elementTypesRow.bottom
             anchors.left: parent.left
-            anchors.topMargin: 15
+            anchors.topMargin: 10
             anchors.leftMargin: 15
         }
 
@@ -336,7 +556,7 @@ MuseScore {
         // Status label
         StyledTextLabel {
             id: statusLabel
-            text: qsTr("Click 'Select' to find notes with the specified colour")
+            text: qsTr("Click 'Select' to find elements with the specified colour")
             anchors.top: optionsRow.bottom
             anchors.left: parent.left
             anchors.right: parent.right
@@ -358,7 +578,7 @@ MuseScore {
             FlatButton {
                 text: qsTr("Select")
                 accentButton: true
-                onClicked: selectNotesByColour()
+                onClicked: selectByColour()
             }
 
             FlatButton {
