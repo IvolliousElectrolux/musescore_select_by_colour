@@ -447,21 +447,21 @@ MuseScore {
                 rowSpacing: 4
                 columnSpacing: 4
 
-                CheckBox { id: chkNote; text: "Note"; checked: matchNote; onCheckedChanged: matchNote = checked }
-                CheckBox { id: chkStem; text: "Stem"; checked: matchStem; onCheckedChanged: matchStem = checked }
-                CheckBox { id: chkBeam; text: "Beam"; checked: matchBeam; onCheckedChanged: matchBeam = checked }
-                CheckBox { id: chkHook; text: "Hook"; checked: matchHook; onCheckedChanged: matchHook = checked }
-                CheckBox { id: chkDot; text: "Dot"; checked: matchNoteDot; onCheckedChanged: matchNoteDot = checked }
-                CheckBox { id: chkSlur; text: "Slur"; checked: matchSlur; onCheckedChanged: matchSlur = checked }
-                CheckBox { id: chkTie; text: "Tie"; checked: matchTie; onCheckedChanged: matchTie = checked }
-                CheckBox { id: chkAccid; text: "Accid."; checked: matchAccidental; onCheckedChanged: matchAccidental = checked }
-                CheckBox { id: chkArtic; text: "Artic."; checked: matchArticulation; onCheckedChanged: matchArticulation = checked }
-                CheckBox { id: chkRest; text: "Rest"; checked: matchRest; onCheckedChanged: matchRest = checked }
-                CheckBox { id: chkLyrics; text: "Lyrics"; checked: matchLyrics; onCheckedChanged: matchLyrics = checked }
-                CheckBox { id: chkDyn; text: "Dynamic"; checked: matchDynamic; onCheckedChanged: matchDynamic = checked }
-                CheckBox { id: chkHairpin; text: "Hairpin"; checked: matchHairpin; onCheckedChanged: matchHairpin = checked }
-                CheckBox { id: chkOttava; text: "Ottava"; checked: matchOttava; onCheckedChanged: matchOttava = checked }
-                CheckBox { id: chkPedal; text: "Pedal"; checked: matchPedal; onCheckedChanged: matchPedal = checked }
+                CheckBox { id: chkNote; text: "Note"; checked: matchNote; onClicked: { checked = !checked; matchNote = checked } }
+                CheckBox { id: chkStem; text: "Stem"; checked: matchStem; onClicked: { checked = !checked; matchStem = checked } }
+                CheckBox { id: chkBeam; text: "Beam"; checked: matchBeam; onClicked: { checked = !checked; matchBeam = checked } }
+                CheckBox { id: chkHook; text: "Hook"; checked: matchHook; onClicked: { checked = !checked; matchHook = checked } }
+                CheckBox { id: chkDot; text: "Dot"; checked: matchNoteDot; onClicked: { checked = !checked; matchNoteDot = checked } }
+                CheckBox { id: chkSlur; text: "Slur"; checked: matchSlur; onClicked: { checked = !checked; matchSlur = checked } }
+                CheckBox { id: chkTie; text: "Tie"; checked: matchTie; onClicked: { checked = !checked; matchTie = checked } }
+                CheckBox { id: chkAccid; text: "Accid."; checked: matchAccidental; onClicked: { checked = !checked; matchAccidental = checked } }
+                CheckBox { id: chkArtic; text: "Artic."; checked: matchArticulation; onClicked: { checked = !checked; matchArticulation = checked } }
+                CheckBox { id: chkRest; text: "Rest"; checked: matchRest; onClicked: { checked = !checked; matchRest = checked } }
+                CheckBox { id: chkLyrics; text: "Lyrics"; checked: matchLyrics; onClicked: { checked = !checked; matchLyrics = checked } }
+                CheckBox { id: chkDyn; text: "Dynamic"; checked: matchDynamic; onClicked: { checked = !checked; matchDynamic = checked } }
+                CheckBox { id: chkHairpin; text: "Hairpin"; checked: matchHairpin; onClicked: { checked = !checked; matchHairpin = checked } }
+                CheckBox { id: chkOttava; text: "Ottava"; checked: matchOttava; onClicked: { checked = !checked; matchOttava = checked } }
+                CheckBox { id: chkPedal; text: "Pedal"; checked: matchPedal; onClicked: { checked = !checked; matchPedal = checked } }
             }
         }
 
@@ -507,12 +507,14 @@ MuseScore {
                 id: useSelectionCheck
                 text: qsTr("Search in selection only")
                 checked: false
+                onClicked: checked = !checked
             }
 
             CheckBox {
                 id: matchAlphaCheck
                 text: qsTr("Match alpha")
                 checked: false
+                onClicked: checked = !checked
             }
         }
 
