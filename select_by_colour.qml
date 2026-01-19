@@ -113,61 +113,97 @@ MuseScore {
     }
 
     // Check element and add to list if matches
-    function checkElement(el, elementsToSelect) {
+    // For sub-elements that can't be selected directly, select parent note/chord instead
+    function checkElement(el, elementsToSelect, selectableElements) {
         if (!el || el.color === undefined) return
         if (shouldMatchType(el.type) && colorsMatch(el.color)) {
-            elementsToSelect.push(el)
             matchedCount++
+            // These element types can be selected directly
+            if (el.type === Element.NOTE || el.type === Element.REST ||
+                el.type === Element.SLUR || el.type === Element.HAIRPIN ||
+                el.type === Element.OTTAVA || el.type === Element.PEDAL ||
+                el.type === Element.DYNAMIC || el.type === Element.LYRICS) {
+                selectableElements.push(el)
+            }
+            elementsToSelect.push(el)
         }
     }
 
+    // Helper to add note to selectable list (avoid duplicates)
+    function addNoteToSelect(note, selectableElements) {
+        for (var i = 0; i < selectableElements.length; i++) {
+            if (selectableElements[i] === note) return
+        }
+        selectableElements.push(note)
+    }
+
     // Process chord and its sub-elements
-    function processChord(chord, elementsToSelect) {
+    function processChord(chord, elementsToSelect, selectableElements) {
+        var chordHasMatch = false
+
         // Notes
         if (matchNote) {
             for (var n = 0; n < chord.notes.length; n++) {
                 var note = chord.notes[n]
                 if (colorsMatch(note.color)) {
                     elementsToSelect.push(note)
-                    matchedCount++
-                }
-                // Note dots
-                if (matchNoteDot && note.dots) {
-                    for (var d = 0; d < note.dots.length; d++) {
-                        if (note.dots[d] && colorsMatch(note.dots[d].color)) {
-                            elementsToSelect.push(note.dots[d])
-                            matchedCount++
-                        }
-                    }
-                }
-                // Accidentals
-                if (matchAccidental && note.accidental && colorsMatch(note.accidental.color)) {
-                    elementsToSelect.push(note.accidental)
-                    matchedCount++
-                }
-                // Ties from note
-                if (matchTie && note.tieForward && colorsMatch(note.tieForward.color)) {
-                    elementsToSelect.push(note.tieForward)
+                    selectableElements.push(note)
                     matchedCount++
                 }
             }
         }
 
+        // Note-attached elements (select the note if these match)
+        for (var n2 = 0; n2 < chord.notes.length; n2++) {
+            var note2 = chord.notes[n2]
+
+            // Note dots
+            if (matchNoteDot && note2.dots) {
+                for (var d = 0; d < note2.dots.length; d++) {
+                    if (note2.dots[d] && colorsMatch(note2.dots[d].color)) {
+                        elementsToSelect.push(note2.dots[d])
+                        addNoteToSelect(note2, selectableElements)
+                        matchedCount++
+                    }
+                }
+            }
+
+            // Accidentals
+            if (matchAccidental && note2.accidental && colorsMatch(note2.accidental.color)) {
+                elementsToSelect.push(note2.accidental)
+                addNoteToSelect(note2, selectableElements)
+                matchedCount++
+            }
+
+            // Ties from note
+            if (matchTie && note2.tieForward && colorsMatch(note2.tieForward.color)) {
+                elementsToSelect.push(note2.tieForward)
+                addNoteToSelect(note2, selectableElements)
+                matchedCount++
+            }
+        }
+
+        // Chord-level elements (select first note if these match)
+        var firstNote = chord.notes.length > 0 ? chord.notes[0] : null
+
         // Stem
         if (matchStem && chord.stem && colorsMatch(chord.stem.color)) {
             elementsToSelect.push(chord.stem)
+            if (firstNote) addNoteToSelect(firstNote, selectableElements)
             matchedCount++
         }
 
         // Hook
         if (matchHook && chord.hook && colorsMatch(chord.hook.color)) {
             elementsToSelect.push(chord.hook)
+            if (firstNote) addNoteToSelect(firstNote, selectableElements)
             matchedCount++
         }
 
         // Beam
         if (matchBeam && chord.beam && colorsMatch(chord.beam.color)) {
             elementsToSelect.push(chord.beam)
+            if (firstNote) addNoteToSelect(firstNote, selectableElements)
             matchedCount++
         }
 
@@ -176,6 +212,7 @@ MuseScore {
             for (var a = 0; a < chord.articulations.length; a++) {
                 if (colorsMatch(chord.articulations[a].color)) {
                     elementsToSelect.push(chord.articulations[a])
+                    if (firstNote) addNoteToSelect(firstNote, selectableElements)
                     matchedCount++
                 }
             }
@@ -183,12 +220,12 @@ MuseScore {
     }
 
     // Process segment annotations
-    function processAnnotations(segment, track, elementsToSelect) {
+    function processAnnotations(segment, track, elementsToSelect, selectableElements) {
         if (!segment.annotations) return
         for (var i = 0; i < segment.annotations.length; i++) {
             var anno = segment.annotations[i]
             if (anno.track === track) {
-                checkElement(anno, elementsToSelect)
+                checkElement(anno, elementsToSelect, selectableElements)
             }
         }
     }
@@ -201,7 +238,8 @@ MuseScore {
         }
 
         var hasSelection = curScore.selection.elements.length > 0
-        var elementsToSelect = []
+        var elementsToSelect = []      // All matched elements (for counting)
+        var selectableElements = []    // Elements that can actually be selected
         matchedCount = 0
 
         var targetInfo = matchAlphaCheck.checked ?
@@ -212,7 +250,7 @@ MuseScore {
             // Search within current selection
             for (var i = 0; i < curScore.selection.elements.length; i++) {
                 var el = curScore.selection.elements[i]
-                checkElement(el, elementsToSelect)
+                checkElement(el, elementsToSelect, selectableElements)
             }
         } else {
             // Search entire score
@@ -228,17 +266,18 @@ MuseScore {
 
                         if (cursor.element) {
                             if (cursor.element.type === Element.CHORD) {
-                                processChord(cursor.element, elementsToSelect)
+                                processChord(cursor.element, elementsToSelect, selectableElements)
                             } else if (cursor.element.type === Element.REST && matchRest) {
                                 if (colorsMatch(cursor.element.color)) {
                                     elementsToSelect.push(cursor.element)
+                                    selectableElements.push(cursor.element)
                                     matchedCount++
                                 }
                             }
                         }
 
                         // Check annotations (dynamics, lyrics, etc.)
-                        processAnnotations(cursor.segment, track, elementsToSelect)
+                        processAnnotations(cursor.segment, track, elementsToSelect, selectableElements)
 
                         cursor.next()
                     }
@@ -250,19 +289,28 @@ MuseScore {
                 var spanners = curScore.spanners
                 for (var s in spanners) {
                     var spanner = spanners[s]
-                    checkElement(spanner, elementsToSelect)
+                    checkElement(spanner, elementsToSelect, selectableElements)
                 }
             }
         }
 
-        if (elementsToSelect.length > 0) {
+        if (selectableElements.length > 0) {
             curScore.startCmd()
             curScore.selection.clear()
-            for (var j = 0; j < elementsToSelect.length; j++) {
-                curScore.selection.select(elementsToSelect[j], true)
+            for (var j = 0; j < selectableElements.length; j++) {
+                curScore.selection.select(selectableElements[j], true)
             }
             curScore.endCmd()
-            statusLabel.text = qsTr("Selected %1 element(s)").arg(matchedCount)
+            // Show both matched count and actually selected count
+            if (matchedCount !== selectableElements.length) {
+                statusLabel.text = qsTr("Found %1, selected %2 (some elements select via parent note)")
+                    .arg(matchedCount).arg(selectableElements.length)
+            } else {
+                statusLabel.text = qsTr("Selected %1 element(s)").arg(matchedCount)
+            }
+        } else if (matchedCount > 0) {
+            // Found elements but none could be selected
+            statusLabel.text = qsTr("Found %1 element(s) but none can be selected directly").arg(matchedCount)
         } else {
             statusLabel.text = qsTr("No elements found with colour %1").arg(targetInfo)
         }
